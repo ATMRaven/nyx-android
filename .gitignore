@@ -17,3 +17,5 @@ android/capacitor-cordova-android-plugins/
 *.jks
 keystore.properties
 .keystore-credentials.txt
+# locally downloaded release artifacts
+release/
