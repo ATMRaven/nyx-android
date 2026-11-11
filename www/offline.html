@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Nyx — offline</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #08080c; color: #e8e4f2;
+    font: 400 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: grid; place-items: center; padding: 32px calc(24px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left)); }
+  .wrap { max-width: 360px; text-align: center; }
+  .mark { font-size: 34px; color: #b79cff; text-shadow: 0 0 28px rgba(160,120,255,.55); }
+  h1 { margin: 14px 0 6px; font-size: 20px; letter-spacing: .01em; font-weight: 600; }
+  p { margin: 0 0 22px; color: #9a94ab; font-size: 13.5px; }
+  button { appearance: none; border: 1px solid rgba(183,156,255,.35); background: rgba(183,156,255,.12);
+    color: #d9cfff; font: inherit; font-weight: 600; padding: 13px 26px; border-radius: 14px; }
+  button:active { transform: scale(.97); }
+  .hint { margin-top: 18px; font-size: 11.5px; color: #5f5a70; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="mark">✦</div>
+    <h1>Nyx can't reach the room</h1>
+    <p>Your phone is offline, or the Worker is unreachable. Nothing was lost — everything lives in your own database.</p>
+    <button id="retry" type="button">Try again</button>
+    <div class="hint">The last screen you saw still works offline from cache.</div>
+  </div>
+<script>
+  var url = 'https://nyx-app.atmr.workers.dev/';
+  function retry() { location.replace(url); }
+  document.getElementById('retry').addEventListener('click', retry);
+  window.addEventListener('online', retry);
+  // A cached app shell can still boot when the network is flaky.
+  setTimeout(function () {
+    if (navigator.onLine) location.replace(url);
+  }, 2500);
+</script>
+</body>
+</html>

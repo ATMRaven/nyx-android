@@ -1,0 +1,148 @@
+name: Android Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to GitHub Releases'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: nyx
+
+jobs:
+  build:
+    name: Build & Verify Signed APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Ensure Android SDK 36 is present
+        run: |
+          SDKMANAGER=$(ls -d $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -n 1)
+          if [ -z "$SDKMANAGER" ]; then SDKMANAGER=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager; fi
+          yes | "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools" > /tmp/sdk.log 2>&1 || tail -n 20 /tmp/sdk.log
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms"
+          ls "$ANDROID_HOME/build-tools"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Sync Capacitor (web assets + native plugins)
+        run: npx cap sync android
+
+      - name: Determine version
+        id: versioning
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION_NAME="${GITHUB_REF_NAME#v}"
+          else
+            VERSION_NAME=$(node -p "require('./package.json').version || '1.0.0'")
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NAME"
+          MAJOR=${MAJOR:-1}; MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
+          VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION_NAME ($VERSION_CODE)"
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 is not set!"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          printf 'RELEASE_STORE_FILE=release.keystore\nRELEASE_STORE_PASSWORD=%s\nRELEASE_KEY_ALIAS=%s\nRELEASE_KEY_PASSWORD=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/keystore.properties
+
+      - name: Assemble release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -PversionName="${{ steps.versioning.outputs.VERSION_NAME }}" \
+            -PversionCode="${{ steps.versioning.outputs.VERSION_CODE }}" \
+            --no-daemon --stacktrace
+
+      - name: Verify signature and package identity
+        id: verify
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "APK=$APK" >> $GITHUB_OUTPUT
+          echo "Building tools: $BUILD_TOOLS"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | tee /tmp/certs.txt
+          CERT_SHA256=$(grep -i "SHA-256" /tmp/certs.txt | head -n 1 | sed 's/.*: //')
+          echo "CERT_SHA256=$CERT_SHA256" >> $GITHUB_OUTPUT
+          "$BUILD_TOOLS/aapt2" dump badging "$APK" | grep -E "^package|^application-label|native-code" || true
+          APK_SIZE=$(stat -c %s "$APK")
+          APK_SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          echo "APK_SIZE=$APK_SIZE" >> $GITHUB_OUTPUT
+          echo "APK_SHA=$APK_SHA" >> $GITHUB_OUTPUT
+          mkdir -p out
+          cp "$APK" "out/nyx-${{ steps.versioning.outputs.VERSION_NAME }}.apk"
+          cat > out/latest.json <<EOF
+          {
+            "version": "${{ steps.versioning.outputs.VERSION_NAME }}",
+            "versionCode": ${{ steps.versioning.outputs.VERSION_CODE }},
+            "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.versioning.outputs.VERSION_NAME }}/nyx-${{ steps.versioning.outputs.VERSION_NAME }}.apk",
+            "sha256": "$APK_SHA",
+            "size": $APK_SIZE,
+            "certSha256": "$CERT_SHA256"
+          }
+          EOF
+          cat out/latest.json
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nyx-apk-v${{ steps.versioning.outputs.VERSION_NAME }}
+          path: out/*
+
+      - name: Publish release
+        if: (github.ref_type == 'tag' && github.event_name == 'push') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.versioning.outputs.VERSION_NAME }}
+          name: Nyx v${{ steps.versioning.outputs.VERSION_NAME }}
+          body: |
+            Nyx Android shell v${{ steps.versioning.outputs.VERSION_NAME }} (code ${{ steps.versioning.outputs.VERSION_CODE }}).
+
+            - Package: `com.atmr.nyx`
+            - APK sha256: `${{ steps.verify.outputs.APK_SHA }}`
+            - Signing cert SHA-256: `${{ steps.verify.outputs.CERT_SHA256 }}`
+          files: out/*
+          draft: false
+          prerelease: false

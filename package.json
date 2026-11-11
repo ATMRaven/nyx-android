@@ -1,0 +1,31 @@
+{
+  "name": "nyx-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nyx — native Android shell (Capacitor) for the private roleplay app",
+  "scripts": {
+    "sync": "cap sync android",
+    "sync:copy": "cap copy android",
+    "open": "cap open android",
+    "build:apk": "cd android && gradlew.bat assembleDebug",
+    "release:android": "node scripts/release.cjs"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.0",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/keyboard": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.0",
+    "sharp": "^0.35.5"
+  }
+}

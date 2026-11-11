@@ -1,0 +1,43 @@
+{
+  "appId": "com.atmr.nyx",
+  "appName": "Nyx",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true,
+    "backgroundColor": "#08080c"
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false,
+    "url": "https://nyx-app.atmr.workers.dev",
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "nyx-app.atmr.workers.dev",
+      "*.backblazeb2.com",
+      "voxflow-809.pages.dev"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": false,
+      "backgroundColor": "#08080c",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#08080c",
+      "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
+    }
+  }
+}

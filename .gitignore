@@ -1,0 +1,19 @@
+node_modules/
+*.log
+.DS_Store
+
+# Android build output
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/capacitor-cordova-android-plugins/
+
+# Signing material never leaves this machine except as a GitHub secret
+*.keystore
+*.jks
+keystore.properties
+.keystore-credentials.txt
