@@ -48,3 +48,14 @@ try {
   process.exit(1);
 }
 run(`gh release view v${next}`);
+
+// Mirror the APK onto the app's own origin so the archive card keeps working
+// (https://nyx-app.atmr.workers.dev/nyx.apk is a stable download URL).
+try {
+  run(`gh release download v${next} --dir release --clobber`);
+  const apk = `release/nyx-${next}.apk`;
+  fs.copyFileSync(path.join(root, apk), path.resolve(root, '..', 'public', 'nyx.apk'));
+  console.log('\nCopied the APK to ../public/nyx.apk — run: cd ../worker && npx wrangler deploy');
+} catch {
+  console.error('Could not mirror the APK to public/nyx.apk — do it by hand.');
+}
